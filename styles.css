@@ -276,10 +276,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 }
 
 /* ===== Calendar grid ===== */
-.calendar-wrap { padding: 0 28px; }
+.calendar-wrap { padding: 0 28px; overflow-x: auto; }
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
   gap: 8px;
 }
 .day-header {
@@ -294,6 +294,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   border: 1px solid var(--border);
   border-radius: var(--radius);
   min-height: 116px;
+  min-width: 110px;
   padding: 10px;
   cursor: pointer;
   display: flex;
@@ -631,8 +632,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 /* ===== Responsive ===== */
 @media (max-width: 720px) {
   body { font-size: 17px; }
-  .calendar-grid { grid-template-columns: repeat(7, 1fr); gap: 5px; }
-  .day-cell { min-height: 82px; padding: 6px; }
+  .calendar-grid { grid-template-columns: repeat(7, minmax(72px, 1fr)); gap: 5px; }
+  .day-cell { min-height: 82px; min-width: 72px; padding: 6px; }
   .day-pill { font-size: 11px; }
   .day-header { font-size: 11px; padding: 4px 0 8px; }
   .topbar { padding: 14px 16px; }
