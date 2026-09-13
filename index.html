@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Activity Calendar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- ROLE SELECT SCREEN -->
+  <div id="roleScreen" class="role-screen">
+    <div class="role-card">
+      <h1>Activity Calendar</h1>
+      <p class="role-sub">Please choose who is signing in.</p>
+      <div class="role-buttons">
+        <button class="role-btn role-btn-admin" data-role="admin">
+          <span>Admin<br><small>Add &amp; edit activities</small></span>
+        </button>
+        <button class="role-btn role-btn-staff" data-role="viewer">
+          <span>Staff<br><small>View the calendar</small></span>
+        </button>
+      </div>
+      <div id="adminPinWrap" class="pin-wrap hidden">
+        <label for="adminPin">Enter Admin PIN</label>
+        <input type="password" id="adminPin" inputmode="numeric" maxlength="6" placeholder="• • • •">
+        <button id="pinSubmit" class="btn btn-primary btn-block">Enter</button>
+        <p id="pinError" class="pin-error hidden">That PIN isn't right. Please try again.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="app" class="app hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <h1 class="app-title">Activity Calendar</h1>
+        <span id="roleBadge" class="role-badge"></span>
+      </div>
+      <div class="topbar-right">
+        <button id="backupBtn" class="btn btn-ghost">Download Backup</button>
+        <div class="dropdown" id="printDropdown">
+          <button id="printMenuBtn" class="btn btn-ghost">Print ▾</button>
+          <div id="printMenu" class="dropdown-menu hidden">
+            <button type="button" id="printListItem" class="dropdown-item">Print List</button>
+            <button type="button" id="printCalendarItem" class="dropdown-item">Print Calendar</button>
+          </div>
+        </div>
+        <button id="historyBtn" class="btn btn-ghost">Activity History</button>
+        <button id="switchUserBtn" class="btn btn-ghost">Switch User</button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <div class="view-tabs" role="tablist" aria-label="View">
+        <button class="view-tab active" data-view="calendar">Calendar</button>
+        <button class="view-tab" data-view="list">List View</button>
+      </div>
+
+      <div id="calendarNav" class="month-nav">
+        <button id="prevMonth" class="nav-btn" aria-label="Previous month">‹</button>
+        <div class="month-label" id="monthLabel">Month Year</div>
+        <button id="nextMonth" class="nav-btn" aria-label="Next month">›</button>
+        <button id="todayBtn" class="btn btn-secondary">Today</button>
+        <button id="fitScreenBtn" class="btn btn-secondary" title="Shrink the calendar so it fits on screen with no scrolling — handy for presentations">⤢ Fit to Screen</button>
+      </div>
+
+      <div class="search-row">
+        <div class="search-field">
+          <label for="activitySearchInput">Activity name</label>
+          <input type="text" id="activitySearchInput" list="activityNameOptions" placeholder="e.g. Bingo Afternoon">
+          <datalist id="activityNameOptions"></datalist>
+        </div>
+        <div class="search-field">
+          <label for="staffSearchInput">Staff / in-charge</label>
+          <input type="text" id="staffSearchInput" list="staffNameOptions" placeholder="e.g. Juan">
+          <datalist id="staffNameOptions"></datalist>
+        </div>
+      </div>
+
+      <div class="filters">
+        <button class="filter-chip active" data-filter="all">All</button>
+        <button class="filter-chip" data-filter="Pending">Pending</button>
+        <button class="filter-chip" data-filter="Cancelled">Cancelled</button>
+        <button class="filter-chip" data-filter="Finished">Finished</button>
+        <button id="resetFilters" class="btn btn-secondary">Reset Filters</button>
+        <span class="filter-hint">Tip: select more than one status at once.</span>
+      </div>
+
+      <div id="listDateFilters" class="filters hidden">
+        <div class="search-field" style="max-width:160px;">
+          <label for="listYearFilter">Year</label>
+          <select id="listYearFilter"><option value="all">All years</option></select>
+        </div>
+        <div class="search-field" style="max-width:180px;">
+          <label for="listMonthFilter">Month</label>
+          <select id="listMonthFilter"><option value="all">All months</option></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- CALENDAR VIEW -->
+    <main id="calendarView" class="calendar-wrap">
+      <div id="calendarFitOuter" class="calendar-fit-outer">
+        <div id="calendarGrid" class="calendar-grid"></div>
+      </div>
+      <div id="emptyState" class="empty-state hidden">
+        <p>No activities match your search or filter.</p>
+      </div>
+    </main>
+
+    <!-- LIST VIEW -->
+    <main id="listView" class="list-view hidden">
+      <div class="table-scroll">
+        <table class="activity-table">
+          <thead>
+            <tr>
+              <th>Date &amp; Time</th>
+              <th>Activity</th>
+              <th>Venue</th>
+              <th>Organizer</th>
+              <th>Participants</th>
+              <th>In-Charge</th>
+              <th>Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="activityTableBody"></tbody>
+        </table>
+      </div>
+      <div id="listEmptyState" class="empty-state hidden">
+        <p>No activities match your search or filter.</p>
+      </div>
+    </main>
+
+    <!-- Add button, Admin only -->
+    <button id="addActivityBtn" class="fab hidden" aria-label="Add new activity">+ Add Activity</button>
+  </div>
+
+  <!-- DAY / ACTIVITY LIST MODAL -->
+  <div id="dayModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="dayModalTitle">Activities</h2>
+        <button class="modal-close" data-close="dayModal">×</button>
+      </div>
+      <div id="dayModalList" class="day-list"></div>
+      <button id="addFromDay" class="btn btn-primary btn-block hidden">+ Add Activity This Day</button>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT ACTIVITY MODAL -->
+  <div id="editModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="editModalTitle">Add Activity</h2>
+        <button class="modal-close" data-close="editModal">×</button>
+      </div>
+      <form id="activityForm" class="activity-form">
+        <input type="hidden" id="activityId">
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="fieldYear">Year</label>
+            <input type="number" id="fieldYear" required>
+          </div>
+          <div class="form-field">
+            <label for="fieldMonth">Month</label>
+            <select id="fieldMonth" required></select>
+          </div>
+          <div class="form-field">
+            <label for="fieldDate">Date</label>
+            <input type="number" id="fieldDate" min="1" max="31" required>
+          </div>
+          <div class="form-field">
+            <label for="fieldTime">Time</label>
+            <input type="time" id="fieldTime">
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="fieldName">Activity Name</label>
+          <input type="text" id="fieldName" required placeholder="e.g. Bingo Afternoon">
+        </div>
+
+        <div class="form-field">
+          <label for="fieldInCharge">In-Charge (Director / Staff Name)</label>
+          <input type="text" id="fieldInCharge" list="inChargeOptions" required placeholder="e.g. Juan Dela Cruz">
+          <datalist id="inChargeOptions"></datalist>
+        </div>
+
+        <div class="form-row">
+          <div class="form-field">
+            <label for="fieldOrganizer">Organizer</label>
+            <input type="text" id="fieldOrganizer" list="organizerOptions" placeholder="e.g. Recreation Committee">
+            <datalist id="organizerOptions"></datalist>
+          </div>
+          <div class="form-field">
+            <label for="fieldVenue">Venue</label>
+            <input type="text" id="fieldVenue" list="venueOptions" placeholder="e.g. Main Hall">
+            <datalist id="venueOptions"></datalist>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="fieldParticipants">Participants</label>
+          <input type="text" id="fieldParticipants" list="participantsOptions" placeholder="e.g. Residents, Ward 2 seniors">
+          <datalist id="participantsOptions"></datalist>
+        </div>
+
+        <div class="form-field">
+          <label>Activity Status</label>
+          <div class="status-toggle" id="statusToggle">
+            <button type="button" class="status-toggle-btn status-pending active" data-status="Pending">Pending</button>
+            <button type="button" class="status-toggle-btn status-cancelled" data-status="Cancelled">Cancelled</button>
+            <button type="button" class="status-toggle-btn status-finished" data-status="Finished">Finished</button>
+          </div>
+        </div>
+
+        <!-- Multi-day toggle -->
+        <div class="checkbox-row">
+          <label><input type="checkbox" id="multiDayCheck"> This activity spans multiple days</label>
+        </div>
+        <div id="multiDayFields" class="conditional-fields hidden">
+          <p class="field-hint">Choose the last day of the activity.</p>
+          <div class="form-row">
+            <div class="form-field">
+              <label for="fieldEndYear">End Year</label>
+              <input type="number" id="fieldEndYear">
+            </div>
+            <div class="form-field">
+              <label for="fieldEndMonth">End Month</label>
+              <select id="fieldEndMonth"></select>
+            </div>
+            <div class="form-field">
+              <label for="fieldEndDate">End Date</label>
+              <input type="number" id="fieldEndDate" min="1" max="31">
+            </div>
+          </div>
+        </div>
+
+        <!-- Recurring toggle -->
+        <div class="checkbox-row" id="recurringCheckRow">
+          <label><input type="checkbox" id="recurringCheck"> Repeat this activity</label>
+        </div>
+        <p id="recurringLockedNote" class="field-hint hidden">Repeat settings can only be set when an activity is first created. Edit this occurrence on its own instead.</p>
+        <div id="recurringFields" class="conditional-fields hidden">
+          <div class="form-field">
+            <label for="fieldFrequency">Repeats</label>
+            <select id="fieldFrequency">
+              <option value="daily">Every day</option>
+              <option value="weekly" selected>Every week</option>
+              <option value="monthly">Every month (same date)</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label>Ends</label>
+            <div class="status-toggle">
+              <button type="button" class="status-toggle-btn recur-mode-btn active" data-mode="date">On a date</button>
+              <button type="button" class="status-toggle-btn recur-mode-btn" data-mode="count">After a number of times</button>
+            </div>
+          </div>
+
+          <div id="recurUntilWrap" class="form-row">
+            <div class="form-field">
+              <label for="fieldRecurUntilYear">Until Year</label>
+              <input type="number" id="fieldRecurUntilYear">
+            </div>
+            <div class="form-field">
+              <label for="fieldRecurUntilMonth">Until Month</label>
+              <select id="fieldRecurUntilMonth"></select>
+            </div>
+            <div class="form-field">
+              <label for="fieldRecurUntilDate">Until Date</label>
+              <input type="number" id="fieldRecurUntilDate" min="1" max="31">
+            </div>
+          </div>
+
+          <div id="recurCountWrap" class="form-field hidden">
+            <label for="fieldRecurCount">Number of occurrences (including this one)</label>
+            <input type="number" id="fieldRecurCount" min="1" max="200" value="4">
+          </div>
+
+          <p id="recurPreview" class="field-hint"></p>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" id="deleteActivityBtn" class="btn btn-danger hidden">Delete</button>
+          <button type="button" id="rescheduleActivityBtn" class="btn btn-secondary hidden" title="Change the date/time above, then click this instead of Save to keep the original as history">Reschedule</button>
+          <button type="submit" class="btn btn-primary">Save Activity</button>
+        </div>
+      </form>
+
+      <div class="note-section" id="editNoteSection">
+        <h3 class="note-section-title">Notes</h3>
+        <div id="editNoteThread" class="note-thread"></div>
+        <div class="note-composer">
+          <textarea id="editNoteInput" rows="2" placeholder="Add a note for staff or other admins..."></textarea>
+          <button type="button" id="editNoteSubmit" class="btn btn-secondary">Add Note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STAFF ACTIVITY VIEW (view details, change status, add notes — no structural edits) -->
+  <div id="viewModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="viewModalTitle">Activity</h2>
+        <button class="modal-close" data-close="viewModal">×</button>
+      </div>
+      <div class="view-meta">
+        <div class="view-meta-name" id="viewName"></div>
+        <div class="view-meta-sub" id="viewMeta"></div>
+      </div>
+
+      <div class="form-field">
+        <label>Activity Status</label>
+        <div class="status-toggle" id="viewStatusToggle">
+          <button type="button" class="status-toggle-btn status-pending" data-status="Pending">Pending</button>
+          <button type="button" class="status-toggle-btn status-cancelled" data-status="Cancelled">Cancelled</button>
+          <button type="button" class="status-toggle-btn status-finished" data-status="Finished">Finished</button>
+        </div>
+      </div>
+
+      <div class="note-section">
+        <h3 class="note-section-title">Notes</h3>
+        <div id="viewNoteThread" class="note-thread"></div>
+        <div class="note-composer">
+          <textarea id="viewNoteInput" rows="2" placeholder="Add a note..."></textarea>
+          <button type="button" id="viewNoteSubmit" class="btn btn-secondary">Add Note</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIRM MODAL (delete confirmation) -->
+  <div id="confirmModal" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 id="confirmTitle">Please Confirm</h2>
+        <button class="modal-close" data-close="confirmModal">×</button>
+      </div>
+      <p id="confirmMessage">Are you sure?</p>
+      <div class="form-actions">
+        <button id="confirmCancelBtn" class="btn btn-secondary">Cancel</button>
+        <button id="confirmOkBtn" class="btn btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BACKUP / AUDIT HISTORY MODAL -->
+  <div id="historyModal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Activity History</h2>
+        <button class="modal-close" data-close="historyModal">×</button>
+      </div>
+      <p class="history-sub">A running log of every activity added, edited, or deleted. Nothing is ever overwritten or lost.</p>
+      <div id="historyList" class="history-list"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- Printable content, only visible in print output -->
+  <div id="printArea" class="print-area"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
